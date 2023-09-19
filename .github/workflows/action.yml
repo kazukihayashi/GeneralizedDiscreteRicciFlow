@@ -1,0 +1,24 @@
+name: Action Example
+
+on:
+  push:
+    branches: 
+      - master
+  workflow_dispatch:
+
+jobs:
+  numpy-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Setup Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.11.4'
+          architecture: 'x64'
+      - name: Get Python version
+        run: python -V
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run Python
+        run: python main.py
