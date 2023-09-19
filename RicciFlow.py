@@ -132,7 +132,7 @@ def Is_Boundary_Node(vert,face):
     
     return is_boundary
 
-def Optimize_Ricci_Energy(vert,face,gauss_target,is_boundary=None,n_step=20,u_change_factor=0.1,boundary_free=False):
+def Optimize_Ricci_Energy(vert,face,gauss_target,is_boundary=None,n_step=20,tol=1.0e-8,u_change_factor=0.1,boundary_free=False):
     '''
     (input)
     vert[nv,3]<float>: vertex positions
@@ -185,6 +185,14 @@ def Optimize_Ricci_Energy(vert,face,gauss_target,is_boundary=None,n_step=20,u_ch
 
         ## Discrete Gaussian curvatures at the vertices
         gauss = Gaussian_Curvature_from_Edge_Length(face,edge_len,is_boundary)
+        gauss_error = gauss_target - gauss
+
+        ## Display error and check convergence criterion
+        print(f'Iter {iter+1}: Error max: {np.max(abs(gauss_error))}')
+        # print(f'Gaussian curvatures: {gauss}')
+        if np.max(abs(gauss_error)) < tol:
+            print(f"Converged. The maximum error of Gaussian curvature has been decreased below tol:{tol}).")
+            break
 
         ## Radical centers at each face
         radical_center = np.vstack([RadicalCircle.RadicalCenter3D(vert[face[i]],gamma[face[i]]) for i in range(len(face))])
@@ -207,25 +215,20 @@ def Optimize_Ricci_Energy(vert,face,gauss_target,is_boundary=None,n_step=20,u_ch
             Hessian[i,i] = -np.sum(Hessian[i])
         # for i in range(len(face)): # equivalent operation for (diagonal elements)
         #     for j in range(3):
-        #         Hessian[face[i,j],face[i,j]] += (h[i,j]/edge_len[i,j]+h[i,(j+2)%3]/edge_len[i,(j+2)%3])
-
-        ## Solve a linear system of equations
-        gauss_error = gauss_target - gauss
+        #         Hessian[face[i,j],face[i,j]] += (h[i,j]/edge_len[i,j]+h[i,(j+2)%3]/edge_len[i,(j+2)%3])       
 
         ## Update u
-        ## (NOTE): np.linalg.solve and sp.linalg.solve do not work due to singular Hessian matrix
+        ## (NOTE): np.linalg.solve and sp.linalg.solve do not work due to ill-conditioned (i.e., singular) Hessian matrix
         if boundary_free:
             mu = sp.sparse.linalg.lsqr(Hessian[~is_boundary][:,~is_boundary],gauss_error[~is_boundary])[0]
             u[~is_boundary] += u_change_factor*mu
-            gauss_error[is_boundary] = 0.0
+            gauss_error[is_boundary] = 0.0 # Ignore Gaussian curvatures at the boundary
         else:
-            mu = sp.sparse.linalg.lsqr(Hessian,gauss_error)[0] # Since Hessian might be ill-conditioned, compute a least-square solution to avoid errors caused by machine precision
+            mu = sp.sparse.linalg.lsqr(Hessian,gauss_error)[0] # Compute a least-square solution of the linear system of equations
             u += u_change_factor*mu
             
         # Update gamma
         gamma = np.exp(u)
 
-        print(f'Iter {iter}: Error max: {np.max(abs(gauss_error))}')
-        # print(f'Gaussian curvatures: {gauss}')
-
+    print(f"Maximum iteration limit (n_step:{n_step}) reached")
     return gamma, Iij, edge_len
