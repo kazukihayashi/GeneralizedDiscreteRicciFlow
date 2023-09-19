@@ -141,7 +141,7 @@ def Optimize_Ricci_Energy(vert,face,gauss_target,is_boundary=None,n_step=20,u_ch
     is_boundary[nv]<bool>: True if the vertex is on the boundary
     n_step<int>: number of updating the inversive circle packing metric
     u_change_factor<float>: stepsize to change the values of u
-    boundary_free<bool>: boundary metric is unchanged if True (experimental, False is recommended)
+    boundary_free<bool>: boundary metric is unchanged if True
 
     (output)
     gamma[nv]<float>: radii of circles at the vertices
@@ -212,14 +212,17 @@ def Optimize_Ricci_Energy(vert,face,gauss_target,is_boundary=None,n_step=20,u_ch
         ## Solve a linear system of equations
         gauss_error = gauss_target - gauss
 
-        # mu = np.linalg.solve(Hessian,gauss_error) # This does not work due to singular Hessian matrix
-        # mu = sp.linalg.solve(Hessian,gauss_error,assume_a='pos') # This does not work, too
-        mu = sp.sparse.linalg.lsqr(Hessian,gauss_error)[0] # Since Hessian might be ill-conditioned, compute a least-square solution to avoid errors caused by machine precision
-            
-        # Update u and gamma
+        ## Update u
+        ## (NOTE): np.linalg.solve and sp.linalg.solve do not work due to singular Hessian matrix
         if boundary_free:
-            mu[is_boundary] = 0.0
-        u += u_change_factor*mu
+            mu = sp.sparse.linalg.lsqr(Hessian[~is_boundary][:,~is_boundary],gauss_error[~is_boundary])[0]
+            u[~is_boundary] += u_change_factor*mu
+            gauss_error[is_boundary] = 0.0
+        else:
+            mu = sp.sparse.linalg.lsqr(Hessian,gauss_error)[0] # Since Hessian might be ill-conditioned, compute a least-square solution to avoid errors caused by machine precision
+            u += u_change_factor*mu
+            
+        # Update gamma
         gamma = np.exp(u)
 
         print(f'Iter {iter}: Error max: {np.max(abs(gauss_error))}')
