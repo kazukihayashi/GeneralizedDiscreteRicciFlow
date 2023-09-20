@@ -34,7 +34,7 @@ gauss_target = np.zeros(len(vert1))
 gauss_target[is_boundary] = 2*np.pi/sum(is_boundary)
 
 ## Optimize Ricci energy for discrete conformal deformation
-gamma,Iij,edge_len = RicciFlow.Optimize_Ricci_Energy(vert1,face1,gauss_target,n_step=500,u_change_factor=0.1,boundary_free=False)
+gamma,Iij,edge_len = RicciFlow.Optimize_Ricci_Energy(vert1,face1,gauss_target,n_step=200,u_change_factor=0.1,boundary_free=False)
 
 ## Flatten the 3D triangular mesh isometrically on the plane
 vert_2D = Flatten.Flatten_Mesh(face1,edge_len,len(vert1))

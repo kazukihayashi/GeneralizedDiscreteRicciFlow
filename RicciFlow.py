@@ -227,6 +227,6 @@ def Optimize_Ricci_Energy(vert,face,gauss_target,is_boundary=None,n_step=20,tol=
             
         # Update gamma
         gamma = np.exp(u)
-
-    print(f"Maximum iteration limit (n_step:{n_step}) reached")
+    if iter == n_step-1:
+        print(f"Maximum iteration limit (n_step:{n_step}) reached")
     return gamma, Iij, edge_len
