@@ -1,51 +1,51 @@
 import numpy as np
-from sympy import solve
-from sympy.abc import x,y
 
 def RadicalCenter2D(center_in,radius_in):
     '''
     (input)
-    center_in[3,2]<float>: circle centers
-    radius_in[3]<float>: circle radii
+    center_in[nf,3,2]<float>: circle centers
+    radius_in[nf,3]<float>: circle radii
 
     (output)
-    center_out[2]<float>: center of the radical circle, which is orthogonal to the 3 circles
+    center_out[nf,2]<float>: centers of the radical circle, which is orthogonal to the 3 circles
     '''
-    circle_equations = []
-    for i in range(3):
-        circle_equations.append(-2*center_in[i,0]*x-2*center_in[i,1]*y+center_in[i,0]**2+center_in[i,1]**2-radius_in[i]**2) # omitted x**2 and y**2 because they are not necessary
+    det = 0.5/((center_in[:,1,0]-center_in[:,0,0])*(center_in[:,2,1]-center_in[:,1,1])-(center_in[:,2,0]-center_in[:,1,0])*(center_in[:,1,1]-center_in[:,0,1]))
+    A_inv = np.array([[center_in[:,2,1]-center_in[:,1,1],center_in[:,0,1]-center_in[:,1,1]],[center_in[:,1,0]-center_in[:,2,0],center_in[:,1,0]-center_in[:,0,0]]]).transpose((2,0,1))
+    b = np.array([center_in[:,1,0]**2-center_in[:,0,0]**2+center_in[:,1,1]**2-center_in[:,0,1]**2+radius_in[:,0]**2-radius_in[:,1]**2,
+                  center_in[:,2,0]**2-center_in[:,1,0]**2+center_in[:,2,1]**2-center_in[:,1,1]**2+radius_in[:,1]**2-radius_in[:,2]**2]).transpose()[:,:,np.newaxis]
+    
+    radical_center_2D = det[:,np.newaxis]*np.squeeze(np.matmul(A_inv,b),axis=2)
 
-    res = solve([circle_equations[1]-circle_equations[0],circle_equations[2]-circle_equations[1]],x,y) # radical center is the intersection of 2 radical axes
-
-    return np.array((res[x],res[y]),dtype=float)
+    return radical_center_2D
 
 def RadicalCenter3D(center_in,radius_in):
     '''
     (input)
-    center_in[3,3]<float>: circle centers
-    radius_in[3]<float>: circle radii
+    center_in[nf,3,3]<float>: circle centers
+    radius_in[nf,3]<float>: circle radii
 
     (output)
-    center_out[3]<float>: center of the radical circle, which is orthogonal to the 3 circles
+    center_out[nf,3]<float>: centers of the radical circle, which is orthogonal to the 3 circles
     '''
     ## Two vectors from one center to another
-    v1 = center_in[1]-center_in[0]
-    v2 = center_in[2]-center_in[0]
-    n1 = np.linalg.norm(v1)
-    n2 = np.linalg.norm(v2)
-    cos = np.dot(v1,v2)/n1/n2
+    v1 = center_in[:,1]-center_in[:,0]
+    v2 = center_in[:,2]-center_in[:,0]
+    n1 = np.linalg.norm(v1,axis=1)
+    n2 = np.linalg.norm(v2,axis=1)
+    cos = np.sum(v1*v2,axis=1)/n1/n2
     sin = np.sqrt(np.clip(1-cos**2,0,1))
 
     ## Compute a radical center projected onto a 2D space
-    center_in_2D = np.zeros((3,2))
-    center_in_2D[1,0] = np.linalg.norm(v1)
-    center_in_2D[2] = cos*n2, sin*n2
+    center_in_2D = np.zeros((len(center_in),3,2))
+    center_in_2D[:,1,0] = n1
+    center_in_2D[:,2,0] = cos*n2
+    center_in_2D[:,2,1] = sin*n2
     center_2D = RadicalCenter2D(center_in_2D,radius_in)
 
     ## Obtain linear combination coefficients for the radical center analytically
-    a2 = center_2D[1]/(sin*n2)
-    a1 = (center_2D[0]-a2*cos*n2)/n1
-    center_3D = center_in[0]+a1*v1+a2*v2
+    a2 = center_2D[:,1]/(sin*n2)
+    a1 = (center_2D[:,0]-a2*cos*n2)/n1
+    center_3D = center_in[:,0]+a1[:,np.newaxis]*v1+a2[:,np.newaxis]*v2
 
     return center_3D
 

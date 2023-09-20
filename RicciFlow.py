@@ -195,7 +195,7 @@ def Optimize_Ricci_Energy(vert,face,gauss_target,is_boundary=None,n_step=20,tol=
             break
 
         ## Radical centers at each face
-        radical_center = np.vstack([RadicalCircle.RadicalCenter3D(vert[face[i]],gamma[face[i]]) for i in range(len(face))])
+        radical_center = RadicalCircle.RadicalCenter3D(vert[face],gamma[face])
 
         # Draw.Draw_Shape(vert,face,True,pt=None)
 
@@ -207,12 +207,10 @@ def Optimize_Ricci_Energy(vert,face,gauss_target,is_boundary=None,n_step=20,tol=
 
         ## Hessian
         Hessian = np.zeros((len(vert),len(vert)))
-        for i in range(len(face)): # (nondiagonal elements)
-            for j in range(3):
-                Hessian[face[i,j],face[i,(j+1)%3]] -= h[i,j]/edge_len[i,j]
+        for j in range(3): # (nondiagonal elements)
+            Hessian[face[:,j],face[:,(j+1)%3]] -= h[:,j]/edge_len[:,j]
         Hessian += Hessian.T
-        for i in range(len(vert)): # (diagonal elements)
-            Hessian[i,i] = -np.sum(Hessian[i])
+        np.fill_diagonal(Hessian,-np.sum(Hessian,axis=1)) # (diagonal elements)
         # for i in range(len(face)): # equivalent operation for (diagonal elements)
         #     for j in range(3):
         #         Hessian[face[i,j],face[i,j]] += (h[i,j]/edge_len[i,j]+h[i,(j+2)%3]/edge_len[i,(j+2)%3])       
