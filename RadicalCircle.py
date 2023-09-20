@@ -49,6 +49,29 @@ def RadicalCenter3D(center_in,radius_in):
 
     return center_3D
 
+def Distance_Radical_Center_To_Edge(vert,face,radical_center):
+    '''
+    (input)
+    vert[nv,3]<float>: vertex positions
+    face[nf,3]<int>: face connectivity
+    radical_center[nf,3]<float>: centers of the radical circle, which is orthogonal to the 3 circles
+
+    (output)
+    dist[nf,3]<float>: the Euclidian shortest distance between the point and the line
+    '''
+
+    ## Distance from the radical center to the edge
+    line_start = vert[face]
+    line_vec = vert[face[:,[1,2,0]]]-vert[face]
+
+    d_vecs = np.zeros([len(face),3,3])
+    for j in range(3):
+        d_vecs[:,j] = (radical_center-line_start[:,j])-np.sum(line_vec[:,j]*(radical_center-line_start[:,j]),axis=1,keepdims=True)*line_vec[:,j]/np.sum(line_vec[:,j]**2,axis=1,keepdims=True)
+
+    dist = np.linalg.norm(d_vecs,axis=2)
+
+    return dist
+
 # ## Example of Drawing a figure of a radical center
 
 # import matplotlib.pyplot as plt

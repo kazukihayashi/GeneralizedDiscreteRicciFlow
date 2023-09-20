@@ -29,11 +29,7 @@ def Edge_Length(vert,face):
     (output)
     edge_len[nf,3]<float>: edge lengths of each face
     '''
-
-    edge_vec = np.zeros((len(face),3,3))
-    for i in range(len(face)):
-        for j in range(3):
-            edge_vec[i,j] = vert[face[i,(j+1)%3]] - vert[face[i,j]]
+    edge_vec = vert[face[:,[1,2,0]]]-vert[face]
     edge_len = np.linalg.norm(edge_vec,axis=2)
 
     return edge_len
@@ -51,31 +47,13 @@ def Gaussian_Curvature_from_Edge_Length(face,edge_len,is_boundary):
     gauss = np.ones_like(is_boundary)*2.0*np.pi # Interior nodes' Gaussian curvature is 2*pi-Sum(angles)
     gauss[is_boundary] -= np.pi # Boundary nodes' Gaussian curvature is pi-Sum(angles)
 
-    for i in range(len(face)):
-        for j in range(3):
-            L1 = edge_len[i,j]
-            L2 = edge_len[i,(j+1)%3]
-            L3 = edge_len[i,(j+2)%3]
-            cc = (L1**2+L3**2-L2**2)/(2.0*L1*L3)
-            if cc>1.0 or cc<-1.0:
-                raise Exception("u_change_factor might be too large. The triangle inequality condition has been violated.")
-            gauss[face[i,j]] -= np.arccos(cc)
+    cc = (edge_len**2+edge_len[:,[2,0,1]]**2-edge_len[:,[1,2,0]]**2)/(2*edge_len*edge_len[:,[2,0,1]])
+    if np.any(cc>1.0) or np.any(cc<-1.0):
+        raise Exception("u_change_factor might be too large. The triangle inequality condition has been violated.")
+
+    np.subtract.at(gauss, face.flatten(), np.arccos(cc).flatten())
 
     return gauss
-
-def Distance_Point_To_Line(point,line_start,line_vec):
-    '''
-    (input)
-    point[2 or 3]<float>: point location
-    line_start[2 or 3]<float>: location of starting point of line
-    line_vec[2 or 3]<float>: directional vector of line
-
-    (output)
-    dist<float>: the Euclidian shortest distance between the point and the line
-    '''
-    d_vec = (point-line_start)-np.dot(line_vec,(point-line_start))*line_vec/np.dot(line_vec,line_vec)
-    dist = np.linalg.norm(d_vec)
-    return dist
 
 def Inversive_Distance(vert,face):
     '''
@@ -93,25 +71,17 @@ def Inversive_Distance(vert,face):
     edge_len_init = Edge_Length(vert,face)
 
     ## gamma_ijk
-    gamma_ijk = np.zeros((len(face),3))
-    for i in range(len(face)):
-        for j in range(3):
-            gamma_ijk[i,j] = (edge_len_init[i,j] + edge_len_init[i,(j+2)%3] - edge_len_init[i,(j+1)%3])/2.0
+    gamma_ijk = (edge_len_init + edge_len_init[:,[2,0,1]] - edge_len_init[:,[1,2,0]])/2.0
 
     ## gamma_init = min_i (gamma_ijk), which is the initial radii of circles
-    gamma_init = np.ones(len(vert))*np.inf
-    for i in range(len(face)):
-        for j in range(3):
-            gamma_init[face[i,j]] = min([gamma_init[face[i,j]],gamma_ijk[i,j]])
+    gamma_init = np.full(len(vert), np.inf)  # Initialize gamma_init with np.inf
+    np.minimum.at(gamma_init, face.flatten(), gamma_ijk.flatten()) # Update gamma_init using element-wise minimum operation
 
     ## Inversive distance
     ## NOTE: discrete conformal deformation is to change gamma only, while PRESERVING inversive distances
-    Iij = np.zeros((len(face),3),dtype=float)
-    for i in range(len(face)):
-        for j in range(3):
-            g1 = gamma_init[face[i,j]]
-            g2 = gamma_init[face[i,(j+1)%3]]
-            Iij[i,j] = (edge_len_init[i,j]**2-g1**2-g2**2)/(2.0*g1*g2)
+    g1 = gamma_init[face]
+    g2 = gamma_init[face[:,[1,2,0]]]
+    Iij = (edge_len_init**2-g1**2-g2**2)/(2*g1*g2)
 
     return Iij, edge_len_init, gamma_init
 
@@ -200,20 +170,14 @@ def Optimize_Ricci_Energy(vert,face,gauss_target,is_boundary=None,n_step=20,tol=
         # Draw.Draw_Shape(vert,face,True,pt=None)
 
         ## Distance from the radical center to the edge
-        h = np.zeros((len(face),3))
-        for i in range(len(face)):
-            for j in range(3):
-                h[i,j] = Distance_Point_To_Line(radical_center[i],vert[face[i,j]],vert[face[i,(j+1)%3]]-vert[face[i,j]])
+        h = RadicalCircle.Distance_Radical_Center_To_Edge(vert,face,radical_center)
 
         ## Hessian
         Hessian = np.zeros((len(vert),len(vert)))
         for j in range(3): # (nondiagonal elements)
             Hessian[face[:,j],face[:,(j+1)%3]] -= h[:,j]/edge_len[:,j]
         Hessian += Hessian.T
-        np.fill_diagonal(Hessian,-np.sum(Hessian,axis=1)) # (diagonal elements)
-        # for i in range(len(face)): # equivalent operation for (diagonal elements)
-        #     for j in range(3):
-        #         Hessian[face[i,j],face[i,j]] += (h[i,j]/edge_len[i,j]+h[i,(j+2)%3]/edge_len[i,(j+2)%3])       
+        np.fill_diagonal(Hessian,-np.sum(Hessian,axis=1)) # (diagonal elements)   
 
         ## Update u
         ## (NOTE): np.linalg.solve and sp.linalg.solve do not work due to ill-conditioned (i.e., singular) Hessian matrix

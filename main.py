@@ -4,12 +4,14 @@ import RicciFlow
 import Flatten
 
 ## Read vertex coordinates
-vert1 = np.loadtxt("vertex_developable.dat")#np.loadtxt("vertex.dat", delimiter=",")
+vert1 = np.loadtxt("vertex_developable.dat")
+# vert1 = np.loadtxt("vertex.dat", delimiter=",")
 # vert1 += np.random.rand(*vert1.shape)*0.5
 # vert1 = np.array([[0,0,0],[1,0,0],[1,1,0],[0,1,0],[0,0,1],[1,0,1],[1,1,1],[0,1,1]],dtype=float)
 
 ## Read face-node relation
-face1 = np.loadtxt("face_developable.dat",dtype=int)-1#np.loadtxt("face.dat", delimiter=",",dtype=int)
+face1 = np.loadtxt("face_developable.dat",dtype=int)
+# face1 = np.loadtxt("face.dat", delimiter=",",dtype=int)
 # face1 = np.array([[0,1,2],[0,2,3],[0,1,5],[0,5,4],[1,2,5],[2,6,5],[2,3,6],[3,6,7],[0,3,4],[3,4,7],[4,5,6],[4,6,7]],dtype=int)
 
 ## Draw initial shape
