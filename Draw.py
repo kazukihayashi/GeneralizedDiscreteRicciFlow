@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from matplotlib.collections import PolyCollection
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
-def Draw_Shape(vert,face,annotate=False,target_edge_length=None,pt=None):
+def Draw_Shape(vert,face,annotate=False,target_edge_length=None,pt=None,edge=None):
     '''
     (input)
     vert[nv,2 or 3]<float>: vertex positions
@@ -40,6 +40,13 @@ def Draw_Shape(vert,face,annotate=False,target_edge_length=None,pt=None):
             ax.scatter3D(pt[:,0],pt[:,1],c="blue")
         else:
             ax.scatter3D(pt[:,0],pt[:,1],pt[:,2],c="blue")
+    if edge is not None:
+        if vert.shape[1] == 3: # 3D
+            for e in edge:
+                ax.plot3D(vert[e,0],vert[e,1],vert[e,2],'b--',linewidth=2)
+        elif vert.shape[1] == 2: # 2D
+            for e in edge:
+                ax.plot(vert[e,0],vert[e,1],'b--',linewidth=2)
 
     ax.axis("equal")
     plt.axis('off')

@@ -2,6 +2,23 @@ import numpy as np
 import scipy as sp
 import RadicalCircle
 
+def Edge_Unique(face,face_attr=None):
+
+    edge1 = np.vstack((face[:,0],face[:,1])).T
+    edge2 = np.vstack((face[:,1],face[:,2])).T
+    edge3 = np.vstack((face[:,2],face[:,0])).T
+    edge = np.hstack((edge1,edge2,edge3)).reshape((-1,2))
+    edge.sort(axis=1)
+    if face_attr is None:
+        edge_unique = np.unique(edge,axis=0) 
+        face_attr_unique = None
+    else:
+        edge_unique, unique_index = np.unique(edge,axis=0,return_index=True)
+        unique_index.sort()
+        face_attr_unique = face_attr.flatten()[unique_index]
+
+    return edge_unique, face_attr_unique
+
 def Euler_Characteristic(vert,face):
     '''
     (input)
@@ -11,12 +28,7 @@ def Euler_Characteristic(vert,face):
     (output)
     <int>: Euler characteristic number (V+E-F)
     '''
-    edge1 = np.vstack((face[:,0],face[:,1])).T
-    edge2 = np.vstack((face[:,1],face[:,2])).T
-    edge3 = np.vstack((face[:,2],face[:,0])).T
-    edge = np.concatenate((edge1,edge2,edge3))
-    edge.sort(axis=1)
-    edge_unique = np.unique(edge,axis=0)
+    edge_unique, _ = Edge_Unique(face)
     
     return len(vert)-len(edge_unique)+len(face)
 
@@ -156,7 +168,8 @@ def Optimize_Ricci_Energy(vert,face,gauss_target,is_boundary=None,n_step=20,tol=
         ## Discrete Gaussian curvatures at the vertices
         gauss = Gaussian_Curvature_from_Edge_Length(face,edge_len,is_boundary)
         gauss_error = gauss_target - gauss
-
+        if boundary_free:
+            gauss_error[is_boundary] = 0.0 # Ignore Gaussian curvatures at the boundary
         ## Display error and check convergence criterion
         print(f'Iter {iter+1}: Error max: {np.max(abs(gauss_error))}')
         # print(f'Gaussian curvatures: {gauss}')
@@ -184,7 +197,6 @@ def Optimize_Ricci_Energy(vert,face,gauss_target,is_boundary=None,n_step=20,tol=
         if boundary_free:
             mu = sp.sparse.linalg.lsqr(Hessian[~is_boundary][:,~is_boundary],gauss_error[~is_boundary])[0]
             u[~is_boundary] += u_change_factor*mu
-            gauss_error[is_boundary] = 0.0 # Ignore Gaussian curvatures at the boundary
         else:
             mu = sp.sparse.linalg.lsqr(Hessian,gauss_error)[0] # Compute a least-square solution of the linear system of equations
             u += u_change_factor*mu
