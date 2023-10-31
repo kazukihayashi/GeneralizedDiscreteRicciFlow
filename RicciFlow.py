@@ -1,44 +1,71 @@
+'''
+Encapsulating the method of
+Yang et al. (2009) "Generalized discrete Ricci flow", in Proc. of Pacific Graphics 2009, Vol. 28, No. 7.
+'''
+
 import numpy as np
 import scipy as sp
 import RadicalCircle
 
-def Edge_Unique(face,face_attr=None):
+def Edge_Unique(face):
+    '''
+    (input)
 
+    face[nf,3]<int>: face connectivity
+
+    (output)
+
+    edge_unique[:]: connectivity of unique edges
+    '''
     edge1 = np.vstack((face[:,0],face[:,1])).T
     edge2 = np.vstack((face[:,1],face[:,2])).T
     edge3 = np.vstack((face[:,2],face[:,0])).T
     edge = np.hstack((edge1,edge2,edge3)).reshape((-1,2))
     edge.sort(axis=1)
-    if face_attr is None:
-        edge_unique = np.unique(edge,axis=0) 
-        face_attr_unique = None
-    else:
-        edge_unique, unique_index = np.unique(edge,axis=0,return_index=True)
-        unique_index.sort()
-        face_attr_unique = face_attr.flatten()[unique_index]
+    edge_unique = np.unique(edge,axis=0) 
 
-    return edge_unique, face_attr_unique
+    return edge_unique
+
+def Face_Area(edge_len):
+    '''
+    (input)
+
+    edge_len[nf,3]<float>: edge lengths of each face
+
+    (output)
+
+    area[nf]: face area of triangular elements
+    '''
+    s = edge_len.sum(axis=1)/2
+    area = np.sqrt(s*(s-edge_len[:,0])*(s-edge_len[:,1])*(s-edge_len[:,2]))
+    return area
 
 def Euler_Characteristic(vert,face):
     '''
     (input)
+
     vert[nv,3]<float>: vertex positions
+
     face[nf,3]<int>: face connectivity
 
     (output)
+
     <int>: Euler characteristic number (V+E-F)
     '''
-    edge_unique, _ = Edge_Unique(face)
+    edge_unique = Edge_Unique(face)
     
     return len(vert)-len(edge_unique)+len(face)
 
 def Edge_Length(vert,face):
     '''
     (input)
+
     vert[nv,3]<float>: vertex positions
+
     face[nf,3]<int>: face connectivity
 
     (output)
+
     edge_len[nf,3]<float>: edge lengths of each face
     '''
     edge_vec = vert[face[:,[1,2,0]]]-vert[face]
@@ -49,11 +76,15 @@ def Edge_Length(vert,face):
 def Gaussian_Curvature_from_Edge_Length(face,edge_len,is_boundary):
     '''
     (input)
+
     face[nf,3]<int>: face connectivity
+
     edge_len[nf,3]<float>: edge lengths of each face
+
     is_boundary[nv]<bool>: True if the vertex is on the boundary
 
     (output)
+
     gauss<float>[nv]: discrete Gaussian curvatures at the vertices
     '''
     gauss = np.ones_like(is_boundary)*2.0*np.pi # Interior nodes' Gaussian curvature is 2*pi-Sum(angles)
@@ -70,12 +101,17 @@ def Gaussian_Curvature_from_Edge_Length(face,edge_len,is_boundary):
 def Inversive_Distance(vert,face):
     '''
     (input)
+
     vert[nv,3]<float>: vertex positions
+
     face[nf,3]<int>: face connectivity
 
     (output)
+
     Iij[nf,3]<float>: inversive distance associated with each edge on the faces
+
     edge_len_init[nf,3]<float>: edge lengths of each face
+
     gamma_init[nv]<float>: radii of circles at the vertices
     '''
 
@@ -97,18 +133,28 @@ def Inversive_Distance(vert,face):
 
     return Iij, edge_len_init, gamma_init
 
-def Is_Boundary_Node(vert,face):
+def Is_Boundary_Node(nv,face):
+    '''
+    (input)
 
-    edge_face = np.zeros((len(vert),len(vert)),dtype=int)
+    nv<int>: number of vertices
+
+    face[nf,3]<int>: face connectivity
+
+    (output)
+
+    is_boundary[nv]<float>: True if the vertex is on the boundary
+    '''
+    edge_face = np.zeros((nv,nv),dtype=int)
     for i in range(len(face)):
         for j in range(3):
             n1 = min(face[i,j],face[i,(j+1)%3])
             n2 = max(face[i,j],face[i,(j+1)%3])
             edge_face[n1,n2] += 1
 
-    is_boundary = np.zeros(len(vert),dtype=bool)
-    for i in range(len(vert)):
-        for j in range(len(vert)):
+    is_boundary = np.zeros(nv,dtype=bool)
+    for i in range(nv):
+        for j in range(nv):
             if edge_face[i,j] == 1:
                 is_boundary[[i,j]] = True
     
@@ -126,9 +172,8 @@ def Optimize_Ricci_Energy(vert,face,gauss_target,is_boundary=None,n_step=20,tol=
     boundary_free<bool>: boundary metric is unchanged if True
 
     (output)
-    gamma[nv]<float>: radii of circles at the vertices
-    Iij[nf,3]<float>: inversive distance associated with each edge on the faces
     edge_len[nf,3]<float>: edge lengths of each face
+    u[nv]<float>: log-conformal factors
     
     (NOTE)
     An appropriate value should be assigned to u_change_factor because of the following tradeoff:
@@ -140,17 +185,20 @@ def Optimize_Ricci_Energy(vert,face,gauss_target,is_boundary=None,n_step=20,tol=
     Step 1: Identify the boundary nodes from mesh connectivity
     '''
     if is_boundary is None:
-        is_boundary = Is_Boundary_Node(vert,face) 
+        is_boundary = Is_Boundary_Node(len(vert),face) 
 
     '''
     Step 2: Compute the initial circle packing metric, i.e., inversive distances
     '''
-    Iij, edge_len, gamma = Inversive_Distance(vert,face)
+    Iij, edge_len_init, gamma_init = Inversive_Distance(vert,face)
+    edge_len = np.copy(edge_len_init)
+    gamma = np.copy(gamma_init)
 
     '''
     Step 3: Initial scalar functions (u) and Gaussian curvatures (gauss)
     '''
-    u = np.log(gamma)
+    u_init = np.log(gamma_init)
+    u = np.copy(u_init)
     gauss = Gaussian_Curvature_from_Edge_Length(face,edge_len,is_boundary)
 
     '''
@@ -180,8 +228,6 @@ def Optimize_Ricci_Energy(vert,face,gauss_target,is_boundary=None,n_step=20,tol=
         ## Radical centers at each face
         radical_center = RadicalCircle.RadicalCenter3D(vert[face],gamma[face])
 
-        # Draw.Draw_Shape(vert,face,True,pt=None)
-
         ## Distance from the radical center to the edge
         h = RadicalCircle.Distance_Radical_Center_To_Edge(vert,face,radical_center)
 
@@ -205,4 +251,5 @@ def Optimize_Ricci_Energy(vert,face,gauss_target,is_boundary=None,n_step=20,tol=
         gamma = np.exp(u)
     if iter == n_step-1:
         print(f"Maximum iteration limit (n_step:{n_step}) reached")
-    return gamma, Iij, edge_len
+
+    return edge_len, u_init-u
