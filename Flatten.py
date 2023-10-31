@@ -124,8 +124,8 @@ def Flatten_Mesh(face, edge_len, nv):
     return vert2D
 
 def Cut(face,cut,is_boundary_vertex,vert_attributes=None):
-
-    if np.any(~is_boundary_vertex[[cut[i][-1] for i in cut]]):
+    
+    if np.any(~is_boundary_vertex[[c[-1] for c in cut]]):
         raise Exception("The last index of each cut must be on the boundary.")
 
     nv = len(is_boundary_vertex)
@@ -146,10 +146,12 @@ def Cut(face,cut,is_boundary_vertex,vert_attributes=None):
     n_add = 0
     for single_cut_line in cut:
 
+        ## Find two faces that shares the first cut line and choose the latter [1]
         f = np.where(np.logical_and(np.any(face==single_cut_line[0],axis=1),np.any(face==single_cut_line[1],axis=1)))[0][1]
         
         for i in range(len(single_cut_line)-1):
             
+            ## The vertex next to 
             neighbor_i = single_cut_line[i]
             
             ## add vert_attributes
@@ -159,11 +161,10 @@ def Cut(face,cut,is_boundary_vertex,vert_attributes=None):
                     vert_attributes_cut[k] = np.concatenate([vert_attributes_cut[k],np.expand_dims(vert_attributes[k][single_cut_line[i+1]],0)],axis=0)
                     
             while True:
-                j = np.where(face[f]==single_cut_line[i+1])[0][0]
-                neighbor_i2 = np.setdiff1d(face[f],[face[f,j],neighbor_i])[0]
-                face_cut[f,j] = nv+n_add+i # Please modify face indexing after modifying the vertex attributes.
+                neighbor_i2 = np.setdiff1d(face[f],[single_cut_line[i+1],neighbor_i])[0]
+                face_cut[f,np.where(face[f]==single_cut_line[i+1])[0][0]] = nv+n_add+i # Please modify face indexing after modifying the vertex attributes.
 
-                if np.all(is_boundary_vertex[[face[f,j],neighbor_i2]]):
+                if np.all(is_boundary_vertex[[single_cut_line[i+1],neighbor_i2]]):
                     break # stop if next
                 if i != len(single_cut_line)-2 and np.any(face[f]==single_cut_line[i+2]):
                     break # stop if next
@@ -171,7 +172,7 @@ def Cut(face,cut,is_boundary_vertex,vert_attributes=None):
                 adj_fs_next_edge = np.isin(face,np.delete(face[f],np.where(face[f]==neighbor_i)[0][0])).sum(axis=1)
                 next_f = int(np.setdiff1d(np.where(adj_fs_next_edge==2)[0],f))
 
-                neighbor_i = int(np.setdiff1d(face_cut[f],[neighbor_i,nv+n_add+i]))
+                neighbor_i = int(np.setdiff1d(face[f],[neighbor_i,single_cut_line[i+1]]))
                 f = next_f
             
         n_add += len(single_cut_line)-1
